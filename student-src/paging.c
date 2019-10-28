@@ -149,11 +149,19 @@ uint8_t mem_access(vaddr_t address, char rw, uint8_t data) {
     /* Split the address and find the page table entry.
        Remember to keep a pointer to the entry so you can modify it later. */
 
+    vpn_t vpn = vaddr_vpn(address);
+    uint16_t offset = vaddr_offset(address);
+    pte_t *page_table_entry = (pte_t *) (mem + PAGE_SIZE * PTBR + vpn);
 
     /* If an entry is invalid, just page fault to allocate a page for the page table. */
+    
+    if (page_table_entry -> valid == 0) {
+        page_fault(address);
+    }
 
     /* Update the timestamp of the appropriate frame table entry with the provided get_current_timestamp function. */
 
+    (frame_table + page_table_entry -> pfn * PAGE_SIZE) -> timestamp = get_current_timestamp(); 
 
     /*
         The physical address will be constructed like this:
@@ -170,18 +178,22 @@ uint8_t mem_access(vaddr_t address, char rw, uint8_t data) {
         and make sure set any relevant values.
     */
 
+    uint8_t *physical_address = mem + (page_table_entry -> pfn) * PAGE_SIZE + offset;
+
 
     /* Either read or write the data to the physical address
        depending on 'rw' */
 
     if (rw == 'r') {
-
+        stats.reads += 1;
     } else {
-
+        page_table_entry -> dirty = 1;
+        *physical_address = data;
+        stats.writes += 1;
     }
 
     /* Return the data read/written */
-    return 0;
+    return *physical_address;
 }
 
 /*  --------------------------------- PROBLEM 8 --------------------------------------
