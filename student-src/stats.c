@@ -19,5 +19,6 @@ stats_t stats;
     -----------------------------------------------------------------------------------
 */
 void compute_stats() {
-
+    double accesses = stats.accesses;
+    stats.aat = (MEMORY_READ_TIME * (stats.reads + stats.writes) + DISK_PAGE_READ_TIME * stats.page_faults + DISK_PAGE_WRITE_TIME * stats.writebacks) / accesses;
 }

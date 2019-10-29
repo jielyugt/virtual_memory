@@ -1,0 +1,15 @@
+[Corruption check]
+gdb ./vm-sim
+./vm-sim -c -i traces/simple.trace -rrandom
+
+[Run in GDB]
+gdb ./vm-sim
+r -i traces/simple.trace -rrandom
+
+[Test random with astar]
+./vm-sim -i traces/astar.trace -rrandom > ./results/astar_random.log
+diff ./results/astar_random.log outputs/astar_random.log
+
+[Test LRU with astar]
+./vm-sim -i traces/astar.trace -rlru > ./results/astar_lru.log
+diff ./results/astar_lru.log outputs/astar_lru.log

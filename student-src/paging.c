@@ -81,8 +81,9 @@ void proc_init(pcb_t *proc) {
      * 1. Call the free frame allocator (free_frame) to return a free frame for
      * this process's page table. You should zero-out the memory.
      */
-    pfn_t pfn = free_frame();
-    memset(frame_table + (pfn * PAGE_SIZE), 0, PAGE_SIZE);
+
+    pfn_t free_frame_number = free_frame();
+    memset(mem + PAGE_SIZE * free_frame_number, 0, PAGE_SIZE);
 
     /*
      * 2. Update the process's PCB with the frame number
@@ -91,8 +92,10 @@ void proc_init(pcb_t *proc) {
      * Additionally, mark the frame's frame table entry as protected. You do not
      * want your page table to be accidentally evicted.
      */
-    proc -> saved_ptbr = pfn;
-    ((fte_t *) frame_table + (pfn * PAGE_SIZE)) -> protected = 1;
+
+    proc -> saved_ptbr = free_frame_number;
+    frame_table[free_frame_number].protected = 1;
+    frame_table[free_frame_number].process = proc;
 }
 
 /*  --------------------------------- PROBLEM 4 --------------------------------------
@@ -144,14 +147,15 @@ void context_switch(pcb_t *proc) {
     -----------------------------------------------------------------------------------
  */
 uint8_t mem_access(vaddr_t address, char rw, uint8_t data) {
+    
 
 
     /* Split the address and find the page table entry.
        Remember to keep a pointer to the entry so you can modify it later. */
-
+    stats.accesses++;
     vpn_t vpn = vaddr_vpn(address);
     uint16_t offset = vaddr_offset(address);
-    pte_t *page_table_entry = (pte_t *) (mem + PAGE_SIZE * PTBR + vpn);
+    pte_t *page_table_entry = (pte_t *) (mem + PAGE_SIZE * PTBR) + vpn;
 
     /* If an entry is invalid, just page fault to allocate a page for the page table. */
     
@@ -161,7 +165,10 @@ uint8_t mem_access(vaddr_t address, char rw, uint8_t data) {
 
     /* Update the timestamp of the appropriate frame table entry with the provided get_current_timestamp function. */
 
-    (frame_table + page_table_entry -> pfn * PAGE_SIZE) -> timestamp = get_current_timestamp(); 
+    fte_t *fte = frame_table + page_table_entry->pfn;
+    fte->timestamp = get_current_timestamp();
+
+    // ((fte_t *) (frame_table + page_table_entry -> pfn)) -> timestamp = get_current_timestamp(); 
 
     /*
         The physical address will be constructed like this:
@@ -185,11 +192,11 @@ uint8_t mem_access(vaddr_t address, char rw, uint8_t data) {
        depending on 'rw' */
 
     if (rw == 'r') {
-        stats.reads += 1;
+        stats.reads++;
     } else {
         page_table_entry -> dirty = 1;
         *physical_address = data;
-        stats.writes += 1;
+        stats.writes++;
     }
 
     /* Return the data read/written */
@@ -212,14 +219,22 @@ uint8_t mem_access(vaddr_t address, char rw, uint8_t data) {
 */
 void proc_cleanup(pcb_t *proc) {
     /* Look up the process's page table */
+    pte_t *page_table_entry = (pte_t *) (mem + PAGE_SIZE * (proc -> saved_ptbr));
 
     /* Iterate the page table and clean up each valid page */
     for (size_t i = 0; i < NUM_PAGES; i++) {
-
+        if (page_table_entry[i].valid == 1) {
+            (frame_table + page_table_entry[i].pfn) -> mapped = 0;
+            (frame_table + page_table_entry[i].pfn) -> protected = 0;
+        }
+        
+        if (swap_exists(page_table_entry + i)) {
+                swap_free(page_table_entry + i);
+        }
     }
 
     /* Free the page table itself in the frame table */
-
+    frame_table[proc -> saved_ptbr].protected = 0;
 }
 
 #pragma GCC diagnostic pop

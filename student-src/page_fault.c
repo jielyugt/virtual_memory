@@ -32,35 +32,53 @@
 
     ----------------------------------------------------------------------------------
  */
+
 void page_fault(vaddr_t address) {
-    /* First, split the faulting address and locate the page table entry.
-       Remember to keep a pointer to the entry so you can modify it later. */
+   /* First, split the faulting address and locate the page table entry.
+      Remember to keep a pointer to the entry so you can modify it later. */
+   stats.page_faults++;   
+   vpn_t vpn = vaddr_vpn(address);
+   pte_t *page_table_entry = (pte_t *) (mem + PAGE_SIZE * PTBR) + vpn;
 
 
-    /* It's a page fault, so the entry obviously won't be valid. Grab
-       a frame to use by calling free_frame(). */
+   /* It's a page fault, so the entry obviously won't be valid. Grab
+      a frame to use by calling free_frame(). */
+   
+   pfn_t free_frame_number = free_frame();
+   fte_t *free_frame = frame_table + free_frame_number;
 
+   /* Update the page table entry. Make sure you set any relevant values. */
 
-    /* Update the page table entry. Make sure you set any relevant values. */
+   page_table_entry -> valid = 1;
+   page_table_entry -> dirty = 0;
+   page_table_entry -> pfn = free_frame_number;
 
+   /* Update the frame table. Make sure you set any relevant values. */
 
-    /* Update the frame table. Make sure you set any relevant values. */
+   free_frame -> mapped = 1;
+   free_frame -> vpn = vpn;
+   free_frame -> process = current_process;
 
+   /* Update the timestamp of the appropriate frame table entry with the provided get_current_timestamp function. */
 
-    /* Update the timestamp of the appropriate frame table entry with the provided get_current_timestamp function. */
+   free_frame -> timestamp = get_current_timestamp();
 
-
-    /* Initialize the page's memory. On a page fault, it is not enough
-     * just to allocate a new frame. We must load in the old data from
-     * disk into the frame. If there was no old data on disk, then
-     * we need to clear out the memory (why?).
-     *
-     * 1) Get a pointer to the new frame in memory.
-     * 2) If the page has swap set, then we need to load in data from memory
-     *    using swap_read().
-     * 3) Else, just zero the page's memory. If the page is later written
-     *    back, swap_write() will automatically allocate a swap entry.
-     */
+   /* Initialize the page's memory. On a page fault, it is not enough
+   * just to allocate a new frame. We must load in the old data from
+   * disk into the frame. If there was no old data on disk, then
+   * we need to clear out the memory (why?).
+   *
+   * 1) Get a pointer to the new frame in memory.
+   * 2) If the page has swap set, then we need to load in data from memory
+   *    using swap_read().
+   * 3) Else, just zero the page's memory. If the page is later written
+   *    back, swap_write() will automatically allocate a swap entry.
+   */
+   if (swap_exists(page_table_entry)) {
+      swap_read(page_table_entry, mem + PAGE_SIZE * free_frame_number);
+   } else {
+      memset(mem + PAGE_SIZE * free_frame_number, 0, PAGE_SIZE);
+   }
 
 }
 

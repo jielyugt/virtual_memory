@@ -40,7 +40,18 @@ pfn_t free_frame(void) {
      *
      */
     if (frame_table[victim_pfn].mapped) {
+        vpn_t vpn = frame_table[victim_pfn].vpn;
+        pcb_t *proc = frame_table[victim_pfn].process;
+        pte_t *page_table_entry = (pte_t *) (mem + PAGE_SIZE * (proc -> saved_ptbr)) + vpn;
 
+        if (page_table_entry -> dirty == 1) {
+            stats.writebacks++;
+            swap_write(page_table_entry, mem + victim_pfn * PAGE_SIZE);
+            page_table_entry -> dirty = 0;
+        }
+
+        page_table_entry -> valid = 0;
+        frame_table[victim_pfn].mapped = 0;
     }
 
 
@@ -92,6 +103,16 @@ pfn_t select_victim_frame() {
     } else if (replacement == LRU) {
         /* Implement an LRU page replacement algorithm here */
         
+        pfn_t oldest_pfn = NUM_FRAMES;
+        timestamp_t oldest_time = get_current_timestamp();
+            
+        for (pfn_t i = 0; i < num_entries; i++) {
+            if (!frame_table[i].protected && frame_table[i].timestamp < oldest_time) {
+                oldest_time = frame_table[i].timestamp;
+                oldest_pfn = i;
+            }
+        }
+        return oldest_pfn;
     }
 
     /* If every frame is protected, give up. This should never happen
