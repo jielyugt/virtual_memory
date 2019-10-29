@@ -10,6 +10,6 @@ r -i traces/simple.trace -rrandom
 ./vm-sim -i traces/astar.trace -rrandom > ./results/astar_random.log
 diff ./results/astar_random.log outputs/astar_random.log
 
-[Test LRU with astar]
+[Test LRU with lru]
 ./vm-sim -i traces/astar.trace -rlru > ./results/astar_lru.log
 diff ./results/astar_lru.log outputs/astar_lru.log
